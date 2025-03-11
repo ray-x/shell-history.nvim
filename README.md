@@ -1,4 +1,4 @@
-# cmp-shellcmd-history
+# cmp-shellcmds-history
 
 A nvim plugin that provides fuzzy completion for shell command history.
 It is a nvim-cmp source for shell command history that reads the shell command history from the shell history file and use it as a completion source.
@@ -6,7 +6,7 @@ It is a nvim-cmp source for shell command history that reads the shell command h
 # Setup
 
 ```lua
-require'cmp_shellcmd_history'.setup{
+require'cmp_shellcmds_history'.setup{
   default_interval=1200000, -- read/refresh history every 20 minutes
 }
 
