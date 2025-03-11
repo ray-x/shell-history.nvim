@@ -1,20 +1,4 @@
 local lprint = lprint or function(...) end
-local defaults = {
-  keyword_pattern = [[.*]],
-  initial_interval = 60 * 1000,
-  default_interval = 20 * 60 * 1000, -- every 20min
-  trigger_chars = { '!' },
-  ignore_cmds = { 'ls', 'll', 'dir', 'cd', 'pwd', 'echo', 'cat', 'htop', 'btop', 'lazygit'},
-  -- skip commands too simple
-  minium_cmd_length = 3,
-  formatter = function(...)
-    -- flatten the arguments
-    return table.concat({...}, ' ')
-  end,
-
-}
-
-local source = {}
 
 -- Detect user's shell
 local function get_shell_type()
@@ -28,12 +12,29 @@ local function get_shell_type()
   end
 end
 
+local source = {
+  config = {
+    keyword_pattern = [[.*]],
+    initial_interval =  10 * 1000, -- 10s
+    default_interval =  20 * 60 * 1000, -- every 20min
+    max_items = 10000,
+    trigger_chars = { '!' },
+    ignore_cmds = { 'ls', 'll', 'dir', 'cd', 'pwd', 'echo', 'cat', 'htop', 'btop', 'lazygit', 'exit'},
+    -- skip commands too simple
+    minium_cmd_length = 3,
+    formatter = function(...)
+      -- flatten the arguments
+      return table.concat({...}, ' ')
+    end,
+  }
+}
 local function get_command_history(callback)
   local shell_type = get_shell_type()
   local cmd
 
   if shell_type == 'fish' then
-    cmd = "history -z | tr '\\0' '\\n' | perl -pe 's/^/$.\t/g; s/\\n/\\n\\t/gm'"
+    cmd = string.format("history -z --max %d | tr '\\0' '\\n' | perl -pe 's/^/$.\t/g; s/\\n/\\n\\t/gm'",
+    source.config.max_items)
   else
     cmd = 'history'
   end
@@ -66,12 +67,10 @@ local function get_command_history(callback)
 end
 
 source.setup = function(config)
-  defaults = vim.tbl_deep_extend('force', defaults, config or {})
+  source.config = vim.tbl_deep_extend('force', source.config, config or {})
 end
 source.new = function()
   local self = setmetatable({}, { __index = source })
-  self.config = defaults
-
   -- Initialize with command history
   get_command_history()
 
@@ -85,7 +84,7 @@ source.new = function()
       end)
     )
   end, 0)
-  lprint(config, self.config, defaults, self)
+  lprint(self.config, self)
 
   return self
 end
@@ -93,7 +92,7 @@ end
 source.get_keyword_pattern = function(_, params)
   params = params or {}
   params.option = params.option or {}
-  params.option = vim.tbl_deep_extend('keep', params.option, defaults)
+  params.option = vim.tbl_deep_extend('keep', params.option, source.config)
   vim.validate({
     keyword_pattern = {
       params.option.keyword_pattern,
@@ -105,7 +104,7 @@ source.get_keyword_pattern = function(_, params)
 end
 
 source.get_trigger_characters = function()
-  return source.config and source.config.trigger_characters or defaults.trigger_characters
+  return source.config and source.config.trigger_characters
 end
 
 -- Check if we're in command-line mode

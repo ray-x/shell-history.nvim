@@ -6,8 +6,10 @@ It is a nvim-cmp source for shell command history that reads the shell command h
 # Setup
 
 ```lua
+-- setup with default values
 require'cmp_shellcmds_history'.setup{
   default_interval=1200000, -- read/refresh history every 20 minutes
+  max_items = 10000, -- maximum number of items to read from history
 }
 
 require'cmp'.setup { name = 'shellcmds_history', option = {
