@@ -4,7 +4,7 @@ local defaults = {
   initial_interval = 60 * 1000,
   default_interval = 20 * 60 * 1000, -- every 20min
   trigger_chars = { '!' },
-  ignore_cmds = { 'ls', 'll', 'dir', 'cd', 'pwd', 'echo', 'cat'},
+  ignore_cmds = { 'ls', 'll', 'dir', 'cd', 'pwd', 'echo', 'cat', 'htop', 'btop', 'lazygit'},
   -- skip commands too simple
   minium_cmd_length = 3,
   formatter = function(...)
