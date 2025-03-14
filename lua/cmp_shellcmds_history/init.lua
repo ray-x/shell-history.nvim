@@ -18,7 +18,7 @@ local source = {
     initial_interval =  10 * 1000, -- 10s
     default_interval =  20 * 60 * 1000, -- every 20min
     max_items = 10000,
-    trigger_chars = { '!' },
+    trigger_chars = { '$', '>', '#' },  -- trigger characters when in editor mode
     ignore_cmds = { 'ls', 'll', 'dir', 'cd', 'pwd', 'echo', 'cat', 'htop', 'btop', 'lazygit', 'exit'},
     -- skip commands too simple
     minium_cmd_length = 3,
@@ -103,8 +103,9 @@ source.get_keyword_pattern = function(_, params)
   return params.option.keyword_pattern or '.*'
 end
 
-source.get_trigger_characters = function()
-  return source.config and source.config.trigger_characters
+local cmd_regex = '\\%([^!#>\\$]\\)'
+source.get_keyword_pattern = function(self, params)
+  return  cmd_regex .. '*'
 end
 
 -- Check if we're in command-line mode
@@ -112,20 +113,24 @@ local function is_cmdline_mode()
   return vim.fn.mode() == 'c'
 end
 
+
 local function is_shell_cmdline(params)
   if not is_cmdline_mode() then
     return false
   end
-  local cursor = params.context.cursor_before_line
+  local cursor = params.context.cursor_before_line or ''
   -- cursor start with '!' in cmdline mode
 
   return cursor:sub(1, 1) == '!'
 end
 
-local function after_trigger_chars(params)
+source.get_trigger_characters = function()
   if is_cmdline_mode() then
-    return false
+    return {'!'}
   end
+  return source.config and source.config.trigger_characters or { '$', '#' }
+end
+local function after_trigger_chars(params)
   local cursor = params.context.cursor_before_line
   local trigger_chars = source.get_trigger_characters()
   local trigger_char = cursor:sub(-1)
@@ -147,9 +152,34 @@ function source:complete(params, callback)
   lprint(params, callback)
 
   if not is_shell_cmdline(params) and not after_trigger_chars(params) then
+    lprint('not in shell cmdline, nor after trigger chars')
     return callback({ items = items, isIncomplete = false })
   end
 
+
+  local trigger_chars = source.get_trigger_characters()
+  local trigger_pos = nil
+  local trigger_char = nil
+
+  local cursor_line = params.context.cursor_before_line
+
+  for _, char in ipairs(trigger_chars) do
+    local pos = cursor_line:find(char .. "[^" .. vim.pesc(char) .. "]*$")
+    if pos and (not trigger_pos or pos > trigger_pos) then
+      trigger_pos = pos
+      trigger_char = char
+    end
+  end
+
+  local search_text = nil
+  if trigger_pos then
+    search_text = cursor_line:sub(trigger_pos + 1)
+  end
+
+  if not trigger_pos and not is_shell_cmdline(params) then
+    lprint('not completing: not after trigger or shell cmdline')
+    return callback({ items = {}, isIncomplete = false })
+  end
   -- Refresh history when completion is triggered
   for _, word in ipairs(source.cmd_hist or {}) do
     -- if word start with ignore_cmds, skip
@@ -165,6 +195,10 @@ function source:complete(params, callback)
         goto continue
       end
     end
+
+    if search_text and search_text ~= "" and not word:lower():find(search_text:lower(), 1, true) then
+      goto continue
+    end
     if not words[word] and input ~= word then
       words[word] = true
       local w = word
@@ -173,12 +207,16 @@ function source:complete(params, callback)
       end
       if is_shell_cmdline(params) then
         word = '!' .. word
+        w = '!' .. w
       end
+
+      local filtered = word
       -- another option is use jobstart and print the output in on_output, so we can run the command in async way
       -- local jobstr = string.format("call jobstart(['/bin/bash', '-c', '%s'], {'on_stdout': {j, d, e -> print(d)}} )", word:sub(2, #word))
       table.insert(items, {
-        label = '!' .. w,
+        label =  w,
         insertText = self.config.formatter(word),
+        filterText = filtered,
         dup = 0,
         cmp = { kind_hl_group = '@keyword.cmd', kind_text = params.option.kind_text or '$' },
       })
@@ -186,8 +224,10 @@ function source:complete(params, callback)
     ::continue::
   end
   if #items == 0 then
+    lprint('no valible shell cmds in history file')
     callback({ items = {}, isIncomplete = false })
   end
+  lprint(items[1], items[2])
   callback({ items = items })
 end
 
