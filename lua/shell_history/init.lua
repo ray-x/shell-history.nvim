@@ -142,7 +142,7 @@ function source:is_available()
 end
 
 source.get_debug_name = function()
-  return 'shellcmd'
+  return 'shell_history'
 end
 
 function source:complete(params, callback)
